@@ -6,6 +6,10 @@ on:
       - 'feature/**'
       - staging
       - main
+  push:
+    branches:
+      - staging
+      - main
 
 jobs:
   deploy:
@@ -19,11 +23,12 @@ jobs:
         with:
           node-version: 20
 
-      # 3. Install dependencies
-      - run: npm install
+      # 3. Install dependencies (with legacy peer deps to fix nodemailer/@auth/core issue)
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
 
-      # 4. Setup DB branch for feature PRs
-      - name: Set database URL
+      # 4. Setup DB URL for feature branches
+      - name: Set Feature Branch DB URL
         if: startsWith(github.ref, 'refs/heads/feature/')
         env:
           NEON_ORG: ${{ secrets.NEON_ORG }}
@@ -32,30 +37,30 @@ jobs:
         run: |
           BRANCH_NAME=$(echo "${GITHUB_HEAD_REF}" | tr '/' '-')
           echo "Creating Neon DB branch for $BRANCH_NAME..."
-          # Create branch from main using Neon CLI
           neon branch create $BRANCH_NAME --parent main --project $NEON_PROJECT --org $NEON_ORG --auth $NEON_ADMIN_KEY
-          # Get the connection string
           DB_URL=$(neon connection-url $BRANCH_NAME --project $NEON_PROJECT --org $NEON_ORG --auth $NEON_ADMIN_KEY)
           echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
           echo "ENV=feature" >> $GITHUB_ENV
 
-      # 5. Setup staging DB for PRs into staging
-      - name: Set staging/prod DB URL
+      # 5. Setup DB URL for staging branch
+      - name: Set Staging DB URL
         if: github.ref == 'refs/heads/staging'
         run: |
           echo "DATABASE_URL=$STAGING_DATABASE_URL" >> $GITHUB_ENV
           echo "ENV=staging" >> $GITHUB_ENV
 
-      - name: Set prod DB URL
+      # 6. Setup DB URL for production branch
+      - name: Set Production DB URL
         if: github.ref == 'refs/heads/main'
         run: |
           echo "DATABASE_URL=$PROD_DATABASE_URL" >> $GITHUB_ENV
           echo "ENV=production" >> $GITHUB_ENV
 
-      # 6. Generate Prisma Client
-      - run: npx prisma generate
+      # 7. Generate Prisma Client
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
-      # 7. Deploy to Vercel
+      # 8. Deploy to Vercel
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v21
         with:
