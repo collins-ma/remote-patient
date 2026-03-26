@@ -1,4 +1,4 @@
-name: CI/CD with in next js 
+name: CI/CD with with next js 
 
 on:
   pull_request:
