@@ -1,0 +1,71 @@
+name: CI/CD 
+
+on:
+  pull_request:
+    branches:
+      - 'feature/**'
+      - staging
+      - main
+  push:
+    branches:
+      - staging
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout code
+      - uses: actions/checkout@v3
+
+      # 2. Setup Node.js
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      # 3. Install dependencies (with legacy peer deps to fix nodemailer/@auth/core issue)
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      # 4. Setup DB URL for feature branches
+      - name: Set Feature Branch DB URL
+        if: startsWith(github.ref, 'refs/heads/feature/')
+        env:
+          NEON_ORG: ${{ secrets.NEON_ORG }}
+          NEON_PROJECT: ${{ secrets.NEON_PROJECT }}
+          NEON_ADMIN_KEY: ${{ secrets.NEON_ADMIN_KEY }}
+        run: |
+          BRANCH_NAME=$(echo "${GITHUB_HEAD_REF}" | tr '/' '-')
+          echo "Creating Neon DB branch for $BRANCH_NAME..."
+          neon branch create $BRANCH_NAME --parent main --project $NEON_PROJECT --org $NEON_ORG --auth $NEON_ADMIN_KEY
+          DB_URL=$(neon connection-url $BRANCH_NAME --project $NEON_PROJECT --org $NEON_ORG --auth $NEON_ADMIN_KEY)
+          echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+          echo "ENV=feature" >> $GITHUB_ENV
+
+      # 5. Setup DB URL for staging branch
+      - name: Set Staging DB URL
+        if: github.ref == 'refs/heads/staging'
+        run: |
+          echo "DATABASE_URL=$STAGING_DATABASE_URL" >> $GITHUB_ENV
+          echo "ENV=staging" >> $GITHUB_ENV
+
+      # 6. Setup DB URL for production branch
+      - name: Set Production DB URL
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "DATABASE_URL=$PROD_DATABASE_URL" >> $GITHUB_ENV
+          echo "ENV=production" >> $GITHUB_ENV
+
+      # 7. Generate Prisma Client
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      # 8. Deploy to Vercel
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v21
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./
+          prod: ${{ github.ref == 'refs/heads/main' }}
