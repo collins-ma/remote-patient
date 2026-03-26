@@ -1,4 +1,4 @@
-name: CI/CD with Feature DBs
+name: CI/CD with in next js 
 
 on:
   pull_request:
