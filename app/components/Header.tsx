@@ -29,7 +29,7 @@ export default function Header() {
 
   // Routes where hamburger + theme toggle are hidden
   const hideControls = pathname === "/" || pathname === "/login"
-
+console.log(hideControls)
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
       
