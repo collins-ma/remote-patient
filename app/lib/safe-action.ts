@@ -10,7 +10,7 @@ export const actionClient = createSafeActionClient({
   },
 
   handleServerError(e) {
-    // Neon unique constraint
+   
     if (e.constructor?.name === "NeonDbError") {
       const err = e as NeonDbError
       if (err.code === "23505") {
@@ -18,12 +18,12 @@ export const actionClient = createSafeActionClient({
       }
     }
 
-    // Prisma unique constraint
+   
     if (e.constructor?.name === "PrismaClientKnownRequestError") {
       return "Unique entry required. This value already exists."
     }
 
-    // Generic fallback
+    
     return "Something went wrong. Please try again later."
   },
 })

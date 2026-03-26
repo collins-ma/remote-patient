@@ -11,8 +11,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-
-  url = env("DATABASE_URL")
 }
 
 model User {
@@ -43,12 +41,12 @@ model Vital {
 }
 
 model Patient {
-  id           Int           @id
-  user         User          @relation(fields: [id], references: [id])
+  id           Int          @id
+  user         User         @relation(fields: [id], references: [id])
   doctorId     Int?
-  doctor       Doctor?       @relation(fields: [doctorId], references: [id])
+  doctor       Doctor?      @relation(fields: [doctorId], references: [id])
   vitals       Vital[]
-  healthStatus HealthStatus? // New field
+  healthStatus HealthStatus @default(GOOD) // New field
 }
 
 enum HealthStatus {

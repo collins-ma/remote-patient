@@ -17,8 +17,9 @@ export const createUserAction = actionClient
   })
   .action(async ({ parsedInput }: { parsedInput: createUserSchemaType }) => {
 
-    // 🔐 Auth check
+    
     const session = await auth()
+
     if (!session) redirect("/login")
 
       
@@ -32,10 +33,10 @@ export const createUserAction = actionClient
 
     const { email, username, password, role } = parsedInput
 
-    // 🔒 Hash password
+    
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // 🧠 Create user
+    
     const user = await prisma.user.create({
       data: {
         email,
@@ -45,11 +46,11 @@ export const createUserAction = actionClient
       },
     })
 
-    // ✅ IMPORTANT PART: create role-specific record
+    
     if (role === "DOCTOR") {
       await prisma.doctor.create({
         data: {
-          id: user.id, // shared primary key
+          id: user.id, 
         },
       })
     }
@@ -57,7 +58,7 @@ export const createUserAction = actionClient
     if (role === "PATIENT") {
       await prisma.patient.create({
         data: {
-          id: user.id, // shared primary key
+          id: user.id, 
         },
       })
     }

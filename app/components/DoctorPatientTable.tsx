@@ -16,12 +16,11 @@ type Props = {
 export default function DoctorPatientTable({ data, fetchError }: Props) {
   const [search, setSearch] = useState("")
 
-  // Show toast if there’s a fetch error (once on mount)
+  // Show toast once if error exists
   useEffect(() => {
     if (fetchError) toast.error(fetchError)
   }, [fetchError])
 
-  // Filter assignments based on search
   const filteredData = useMemo(() => {
     if (!search) return data
     return data.filter(
@@ -32,41 +31,81 @@ export default function DoctorPatientTable({ data, fetchError }: Props) {
   }, [search, data])
 
   return (
-    <div className="overflow-x-auto border rounded-md shadow bg-gray-50 p-4">
-      {/* Optional table-level error */}
+    <div
+      className="overflow-x-auto
+                 bg-white dark:bg-gray-900
+                 border border-gray-200 dark:border-gray-700
+                 rounded-xl shadow-lg
+                 p-6 transition-colors"
+    >
+      {/* Error Message */}
       {fetchError && (
-        <p className="text-red-500 mb-4 text-center font-semibold">{fetchError}</p>
+        <p className="text-red-600 dark:text-red-400 mb-4 text-center font-semibold">
+          {fetchError}
+        </p>
       )}
 
-      {/* Search input */}
-      <input
-        type="text"
-        placeholder="Search by patient or doctor"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full border px-3 py-2 rounded mb-4 focus:outline-none focus:ring focus:ring-blue-300"
-        disabled={!!fetchError} // disable if there was a fetch error
-      />
+      {/* Search */}
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Search by patient or doctor..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          disabled={!!fetchError}
+          className="w-full px-4 py-3 rounded-lg
+                     border border-gray-300 dark:border-gray-600
+                     bg-white dark:bg-gray-800
+                     text-gray-800 dark:text-gray-200
+                     placeholder-gray-400 dark:placeholder-gray-500
+                     focus:outline-none focus:ring-2 focus:ring-blue-500
+                     transition"
+        />
+      </div>
 
-      <table className="w-full table-auto border-collapse border border-gray-300 bg-white">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border px-4 py-2 text-left">Patient</th>
-            <th className="border px-4 py-2 text-left">Doctor</th>
+      {/* Table */}
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="bg-blue-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left">Patient</th>
+            <th className="px-6 py-3 text-left">Doctor</th>
           </tr>
         </thead>
-        <tbody>
+
+        <tbody
+          className="divide-y divide-gray-200 dark:divide-gray-700
+                     text-gray-800 dark:text-gray-200"
+        >
           {filteredData.length === 0 ? (
             <tr>
-              <td colSpan={2} className="text-center py-4 text-gray-500">
-                {fetchError ? "Cannot load assignments" : "No assignments found"}
+              <td
+                colSpan={2}
+                className="text-center py-8 text-gray-400 dark:text-gray-500 italic"
+              >
+                {fetchError
+                  ? "Cannot load assignments"
+                  : "No assignments found"}
               </td>
             </tr>
           ) : (
             filteredData.map((a, index) => (
-              <tr key={index} className="hover:bg-gray-100">
-                <td className="border px-4 py-2">{a.patientName}</td>
-                <td className="border px-4 py-2">{a.doctorName}</td>
+              <tr
+                key={index}
+                className={`transition-colors duration-200
+                  ${
+                    index % 2 === 0
+                      ? "bg-gray-50 dark:bg-gray-800"
+                      : "bg-white dark:bg-gray-900"
+                  }
+                  hover:bg-blue-100 dark:hover:bg-gray-700`}
+              >
+                <td className="px-6 py-4 font-medium">
+                  {a.patientName}
+                </td>
+
+                <td className="px-6 py-4">
+                  {a.doctorName}
+                </td>
               </tr>
             ))
           )}

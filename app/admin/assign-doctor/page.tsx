@@ -6,7 +6,7 @@ import { redirect } from "next/navigation"
 export default async function AssignDoctorPage() {
   const session = await auth()
   if (!session) redirect("/login")
-  if (session.user.role !== "ADMIN") redirect("/login")
+  if (session.user.role !== "ADMIN") redirect("/unauthorized")
 
   // Fetch doctors & patients for dropdown
   const doctors = await prisma.user.findMany({

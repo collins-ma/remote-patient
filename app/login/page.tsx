@@ -1,36 +1,59 @@
 "use client"
 
-import { signIn } from "next-auth/react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { LoaderCircle } from "lucide-react"
+import { signIn } from "next-auth/react"
 
 export default function SignIn() {
-  
   const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault() // prevent default form submission
+    e.preventDefault()
+    setError("")
+    setLoading(true)
 
     const formData = new FormData(e.currentTarget)
     const username = formData.get("username")?.toString()
     const password = formData.get("password")?.toString()
 
     if (!username || !password) {
-      alert("Please enter both username and password")
+      setError("Please enter both username and password")
+      setLoading(false)
       return
     }
 
-    const result = await signIn("credentials", {
-      redirect: false,
-      username,
-      password,
-    })
+    try {
+      const result = await signIn("credentials", {
+        redirect: false,
+        username,
+        password,
+      })
 
-    if (result?.error) {
-      alert("Invalid username or password")
-    }
-    else {
-      // Successful login, redirect to dashboard
-      router.push("/dashboard")
+      if (result?.error) {
+        setError("Invalid username or password")
+        setLoading(false)
+        return
+      }
+
+      // ⚡ Use NextAuth session info via server action after login
+      const res = await fetch("/api/auth/session")
+      const session = await res.json()
+      const role = session?.user?.role
+
+      // Redirect based on role
+      if (role === "DOCTOR") router.push("/doctor-view")
+      else if (role === "PATIENT") router.push("/patient-view")
+      else if (role === "ADMIN") router.push("/users")
+      else router.push("/") // fallback
+
+    } catch (err) {
+      setError("Something went wrong. Please try again.")
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -41,6 +64,8 @@ export default function SignIn() {
         className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg space-y-6"
       >
         <h2 className="text-2xl font-bold text-gray-800 text-center">Sign In</h2>
+
+        {error && <p className="text-red-600 text-center">{error}</p>}
 
         <div className="flex flex-col">
           <label htmlFor="username" className="mb-2 text-gray-700 font-medium">
@@ -72,9 +97,17 @@ export default function SignIn() {
 
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Sign In
+          {loading ? (
+            <>
+              <LoaderCircle className="animate-spin" />
+              Signing In…
+            </>
+          ) : (
+            "Sign In"
+          )}
         </button>
       </form>
     </div>

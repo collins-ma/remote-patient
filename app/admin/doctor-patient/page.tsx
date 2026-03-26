@@ -7,7 +7,7 @@ export default async function AdminDoctorPatientPage() {
   try {
     const session = await auth()
     if (!session) redirect("/login")
-    if (session.user.role !== "ADMIN") redirect("/login")
+    if (session.user.role !== "ADMIN") redirect("/unauthorized")
 
     const assignments = await prisma.patient.findMany({
       include: {
@@ -18,7 +18,7 @@ export default async function AdminDoctorPatientPage() {
 
     console.log("Fetched assignments:", assignments)
 
-    const data = assignments.map((p) => ({
+    const data = assignments.map((p:any) => ({
       patientName: p.user.username,
       doctorName: p.doctor?.user.username ?? "Unassigned",
     }))
