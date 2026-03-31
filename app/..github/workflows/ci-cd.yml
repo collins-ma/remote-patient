@@ -1,27 +1,29 @@
 name: Full CI/CD Pipeline (Feature → Staging → Production)
 
 on:
-  pull_request:
-    branches: [staging, main]
   push:
-    branches: [feature/*, staging, main]
-  pull_request_target:
-    types: [closed]
+    branches: 
+      - 'feature/*'
+      - 'staging'
+      - 'main'
+  pull_request:
+    branches: 
+      - 'feature/*'
+      - 'staging'
+      - 'main'
 
 jobs:
   # --------------------------
-  # 1️⃣ CI JOB (BUILD & TEST)
+  # 1️⃣ CI - Build & Test
   # --------------------------
   ci:
     name: CI - Build & Test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: 20
 
@@ -38,17 +40,16 @@ jobs:
         run: npm run build
 
   # --------------------------
-  # 2️⃣ FEATURE BRANCH PREVIEW
+  # 2️⃣ Feature Preview Deploy
   # --------------------------
   deploy_feature:
     name: Deploy Feature Preview
     runs-on: ubuntu-latest
     needs: ci
-    if: startsWith(github.head_ref, 'feature/') || startsWith(github.ref, 'refs/heads/feature/')
+    if: startsWith(github.head_ref, 'feature/')
 
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -65,7 +66,7 @@ jobs:
           NEON_PROJECT: ${{ secrets.NEON_PROJECT }}
           NEON_ADMIN_KEY: ${{ secrets.NEON_ADMIN_KEY }}
         run: |
-          BRANCH_NAME=$(echo "${{ github.head_ref || github.ref }}" | tr '/' '-')
+          BRANCH_NAME=$(echo "${{ github.head_ref }}" | tr '/' '-')
           neon branch create $BRANCH_NAME \
             --parent main \
             --project $NEON_PROJECT \
@@ -92,7 +93,7 @@ jobs:
           prod: false
 
   # --------------------------
-  # 3️⃣ STAGING DEPLOY
+  # 3️⃣ Staging Deploy
   # --------------------------
   deploy_staging:
     name: Deploy Staging
@@ -102,7 +103,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -130,7 +130,7 @@ jobs:
           prod: false
 
   # --------------------------
-  # 4️⃣ PRODUCTION DEPLOY
+  # 4️⃣ Production Deploy
   # --------------------------
   deploy_production:
     name: Deploy Production
@@ -140,7 +140,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -153,7 +152,7 @@ jobs:
 
       - name: Run Migrations (Production DB)
         env:
-          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: npx prisma migrate deploy
 
       - name: Build App
@@ -168,7 +167,7 @@ jobs:
           prod: true
 
   # --------------------------
-  # 5️⃣ CLEANUP FEATURE DB
+  # 5️⃣ Cleanup Feature DB
   # --------------------------
   cleanup:
     if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'feature/')
