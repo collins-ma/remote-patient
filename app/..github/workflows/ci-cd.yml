@@ -4,13 +4,13 @@ on:
   pull_request:
     branches: [staging, main]
   push:
-    branches: [staging, main]
+    branches: [feature/*, staging, main]
   pull_request_target:
     types: [closed]
 
 jobs:
   # --------------------------
-  # 1️⃣ CI JOB
+  # 1️⃣ CI JOB (BUILD & TEST)
   # --------------------------
   ci:
     name: CI - Build & Test
@@ -44,13 +44,15 @@ jobs:
     name: Deploy Feature Preview
     runs-on: ubuntu-latest
     needs: ci
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/')
+    if: startsWith(github.head_ref, 'feature/') || startsWith(github.ref, 'refs/heads/feature/')
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -63,7 +65,7 @@ jobs:
           NEON_PROJECT: ${{ secrets.NEON_PROJECT }}
           NEON_ADMIN_KEY: ${{ secrets.NEON_ADMIN_KEY }}
         run: |
-          BRANCH_NAME=$(echo "${{ github.head_ref }}" | tr '/' '-')
+          BRANCH_NAME=$(echo "${{ github.head_ref || github.ref }}" | tr '/' '-')
           neon branch create $BRANCH_NAME \
             --parent main \
             --project $NEON_PROJECT \
@@ -100,19 +102,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
+
       - name: Prisma Generate
         run: npx prisma generate
+
       - name: Run Migrations (Staging DB)
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
         run: npx prisma migrate deploy
+
       - name: Build App
         run: npm run build
+
       - name: Deploy to Vercel (Staging)
         uses: amondnet/vercel-action@v21
         with:
@@ -132,19 +140,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
+
       - name: Prisma Generate
         run: npx prisma generate
+
       - name: Run Migrations (Production DB)
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: npx prisma migrate deploy
+
       - name: Build App
         run: npm run build
+
       - name: Deploy to Vercel (Production)
         uses: amondnet/vercel-action@v21
         with:
@@ -163,6 +177,7 @@ jobs:
     steps:
       - name: Install Neon CLI
         run: npm install -g neonctl
+
       - name: Delete Neon Branch
         env:
           NEON_ORG: ${{ secrets.NEON_ORG }}
