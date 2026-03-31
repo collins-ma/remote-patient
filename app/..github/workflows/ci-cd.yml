@@ -102,19 +102,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
+
       - name: Prisma Generate
         run: npx prisma generate
+
       - name: Run Migrations (Staging DB)
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
         run: npx prisma migrate deploy
+
       - name: Build App
         run: npm run build
+
       - name: Deploy to Vercel (Staging)
         uses: amondnet/vercel-action@v21
         with:
@@ -134,19 +140,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
+
       - name: Prisma Generate
         run: npx prisma generate
+
       - name: Run Migrations (Production DB)
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: npx prisma migrate deploy
+
       - name: Build App
         run: npm run build
+
       - name: Deploy to Vercel (Production)
         uses: amondnet/vercel-action@v21
         with:
@@ -165,6 +177,7 @@ jobs:
     steps:
       - name: Install Neon CLI
         run: npm install -g neonctl
+
       - name: Delete Neon Branch
         env:
           NEON_ORG: ${{ secrets.NEON_ORG }}
