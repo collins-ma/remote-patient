@@ -153,7 +153,7 @@ jobs:
 
       - name: Run Migrations (Production DB)
         env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: npx prisma migrate deploy
 
       - name: Build App
