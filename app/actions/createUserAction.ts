@@ -25,6 +25,7 @@ export const createUserAction = actionClient
  
 
     if (!session) redirect("/login")
+      console.log(session)
 
       
       if (session.user.role !== "ADMIN") {
