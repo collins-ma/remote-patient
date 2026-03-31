@@ -20,6 +20,8 @@ export const createUserAction = actionClient
     
     const session = await auth()
 
+    console.log(session)
+
  
 
     if (!session) redirect("/login")
