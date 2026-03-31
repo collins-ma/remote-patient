@@ -1,51 +1,50 @@
-name: PR CI/CD with Preview Deploy
+name: Full CI/CD Pipeline (Feature → Staging → Production)
 
 on:
   pull_request:
-    branches:
-      - staging
-      - main
-
+    branches: [staging, main]
+  push:
+    branches: [feature/*, staging, main]
   pull_request_target:
     types: [closed]
 
 jobs:
   # --------------------------
-  # 1️⃣ CI JOB (LIGHTWEIGHT)
+  # 1️⃣ CI JOB (BUILD & TEST)
   # --------------------------
   ci:
+    name: CI - Build & Test
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      # Install deps
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # Prisma generate
       - name: Prisma Generate
         run: npx prisma generate
 
-      # Check migration issues
       - name: Prisma Migration Status
         run: npx prisma migrate status
 
-      # Build only
       - name: Build App
         run: npm run build
 
   # --------------------------
-  # 2️⃣ PREVIEW DEPLOY
+  # 2️⃣ FEATURE BRANCH PREVIEW
   # --------------------------
-  deploy_preview:
+  deploy_feature:
+    name: Deploy Feature Preview
     runs-on: ubuntu-latest
     needs: ci
-    if: startsWith(github.head_ref, 'feature/')
+    if: startsWith(github.head_ref, 'feature/') || startsWith(github.ref, 'refs/heads/feature/')
 
     steps:
       - uses: actions/checkout@v3
@@ -60,35 +59,31 @@ jobs:
       - name: Install Neon CLI
         run: npm install -g neonctl
 
-      - name: Setup Feature Database
+      - name: Create Neon Branch + DB
         env:
           NEON_ORG: ${{ secrets.NEON_ORG }}
           NEON_PROJECT: ${{ secrets.NEON_PROJECT }}
           NEON_ADMIN_KEY: ${{ secrets.NEON_ADMIN_KEY }}
         run: |
-          BRANCH_NAME=$(echo "${{ github.head_ref }}" | tr '/' '-')
-
+          BRANCH_NAME=$(echo "${{ github.head_ref || github.ref }}" | tr '/' '-')
           neon branch create $BRANCH_NAME \
             --parent main \
             --project $NEON_PROJECT \
             --org $NEON_ORG \
             --auth $NEON_ADMIN_KEY
-
           DB_URL=$(neon connection-url $BRANCH_NAME \
             --project $NEON_PROJECT \
             --org $NEON_ORG \
             --auth $NEON_ADMIN_KEY)
-
           echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
 
-      # SAFE even if no DB changes
-      - name: Prisma Migrate Deploy
+      - name: Run Migrations
         run: npx prisma migrate deploy
 
       - name: Build App
         run: npm run build
 
-      - name: Deploy to Vercel Preview
+      - name: Deploy to Vercel (Preview)
         uses: amondnet/vercel-action@v21
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -97,7 +92,71 @@ jobs:
           prod: false
 
   # --------------------------
-  # 3️⃣ CLEANUP
+  # 3️⃣ STAGING DEPLOY
+  # --------------------------
+  deploy_staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/staging'
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Prisma Generate
+        run: npx prisma generate
+      - name: Run Migrations (Staging DB)
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: npx prisma migrate deploy
+      - name: Build App
+        run: npm run build
+      - name: Deploy to Vercel (Staging)
+        uses: amondnet/vercel-action@v21
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          prod: false
+
+  # --------------------------
+  # 4️⃣ PRODUCTION DEPLOY
+  # --------------------------
+  deploy_production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Prisma Generate
+        run: npx prisma generate
+      - name: Run Migrations (Production DB)
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: npx prisma migrate deploy
+      - name: Build App
+        run: npm run build
+      - name: Deploy to Vercel (Production)
+        uses: amondnet/vercel-action@v21
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          prod: true
+
+  # --------------------------
+  # 5️⃣ CLEANUP FEATURE DB
   # --------------------------
   cleanup:
     if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'feature/')
@@ -106,15 +165,13 @@ jobs:
     steps:
       - name: Install Neon CLI
         run: npm install -g neonctl
-
-      - name: Delete Feature DB
+      - name: Delete Neon Branch
         env:
           NEON_ORG: ${{ secrets.NEON_ORG }}
           NEON_PROJECT: ${{ secrets.NEON_PROJECT }}
           NEON_ADMIN_KEY: ${{ secrets.NEON_ADMIN_KEY }}
         run: |
           BRANCH_NAME=$(echo "${{ github.event.pull_request.head.ref }}" | tr '/' '-')
-
           neon branch delete $BRANCH_NAME \
             --project $NEON_PROJECT \
             --org $NEON_ORG \
