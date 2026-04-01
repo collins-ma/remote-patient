@@ -1,0 +1,10 @@
+name: Debug Actions
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Actions is working"
