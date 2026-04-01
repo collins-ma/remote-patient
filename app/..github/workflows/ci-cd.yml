@@ -8,7 +8,6 @@ on:
       - main
   pull_request:
     branches:
-      - 'feature/*'
       - staging
       - main
 
@@ -26,11 +25,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: 20
 
@@ -53,7 +50,7 @@ jobs:
     name: Deploy Feature Preview
     runs-on: ubuntu-latest
     needs: ci
-    if: startsWith(github.ref, 'refs/heads/feature/') || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'feature/'))
+    if: startsWith(github.ref, 'refs/heads/feature/')
 
     steps:
       - uses: actions/checkout@v3
@@ -65,38 +62,46 @@ jobs:
       - name: Install Dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel@canary
+      - name: Install CLIs
+        run: |
+          npm install -g vercel@latest
+          npm install -g neonctl
 
-      - name: Pull Vercel Preview Environment Variables
+      - name: Link Vercel Project
+        run: vercel link --yes --project $VERCEL_PROJECT_ID --token=$VERCEL_TOKEN
+
+      - name: Pull Vercel Preview Env
         run: vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
 
-      - name: Create Neon Branch + DB
+      - name: Create Neon Branch
         env:
           NEON_ORG: ${{ secrets.NEON_ORG }}
           NEON_PROJECT: ${{ secrets.NEON_PROJECT }}
           NEON_ADMIN_KEY: ${{ secrets.NEON_ADMIN_KEY }}
         run: |
-          BRANCH_NAME=$(echo "${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" | tr '/' '-')
+          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
+
           neon branch create $BRANCH_NAME \
             --parent main \
             --project $NEON_PROJECT \
             --org $NEON_ORG \
-            --auth $NEON_ADMIN_KEY
+            --auth $NEON_ADMIN_KEY || true
+
           DB_URL=$(neon connection-url $BRANCH_NAME \
             --project $NEON_PROJECT \
             --org $NEON_ORG \
             --auth $NEON_ADMIN_KEY)
+
           echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
 
       - name: Run Prisma Migrations
         run: npx prisma migrate deploy
 
-      - name: Build Project Artifacts
+      - name: Build Project
         run: vercel build --token=$VERCEL_TOKEN
 
-      - name: Deploy Project Artifacts to Vercel Preview
-        run: vercel deploy --prebuilt --token=$VERCEL_TOKEN --prod=false
+      - name: Deploy Preview
+        run: vercel deploy --prebuilt --token=$VERCEL_TOKEN --confirm
 
   # --------------------------
   # 3️⃣ Staging Deploy
@@ -109,6 +114,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -117,21 +123,24 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Install Vercel CLI
-        run: npm install -g vercel@canary
+        run: npm install -g vercel@latest
 
-      - name: Pull Vercel Staging Environment
+      - name: Link Vercel Project
+        run: vercel link --yes --project $VERCEL_PROJECT_ID --token=$VERCEL_TOKEN
+
+      - name: Pull Staging Env
         run: vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
 
-      - name: Run Prisma Migrations (Staging DB)
+      - name: Run Prisma Migrations
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
         run: npx prisma migrate deploy
 
-      - name: Build Project Artifacts
+      - name: Build Project
         run: vercel build --token=$VERCEL_TOKEN
 
-      - name: Deploy Project Artifacts to Vercel Staging
-        run: vercel deploy --prebuilt --token=$VERCEL_TOKEN --prod=false
+      - name: Deploy Staging
+        run: vercel deploy --prebuilt --token=$VERCEL_TOKEN --confirm
 
   # --------------------------
   # 4️⃣ Production Deploy
@@ -144,6 +153,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -152,32 +162,37 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Install Vercel CLI
-        run: npm install -g vercel@canary
+        run: npm install -g vercel@latest
 
-      - name: Pull Vercel Production Environment
+      - name: Link Vercel Project
+        run: vercel link --yes --project $VERCEL_PROJECT_ID --token=$VERCEL_TOKEN
+
+      - name: Pull Production Env
         run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
 
-      - name: Run Prisma Migrations (Production DB)
+      - name: Run Prisma Migrations
         env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: npx prisma migrate deploy
 
-      - name: Build Project Artifacts
+      - name: Build Project
         run: vercel build --prod --token=$VERCEL_TOKEN
 
-      - name: Deploy Project Artifacts to Vercel Production
-        run: vercel deploy --prebuilt --token=$VERCEL_TOKEN --prod=true
+      - name: Deploy Production
+        run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN --confirm
 
   # --------------------------
   # 5️⃣ Cleanup Feature DB
   # --------------------------
   cleanup:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'feature/')
+    name: Cleanup Feature DB
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'feature/')
 
     steps:
       - name: Install Neon CLI
         run: npm install -g neonctl
+
       - name: Delete Neon Branch
         env:
           NEON_ORG: ${{ secrets.NEON_ORG }}
@@ -185,6 +200,7 @@ jobs:
           NEON_ADMIN_KEY: ${{ secrets.NEON_ADMIN_KEY }}
         run: |
           BRANCH_NAME=$(echo "${{ github.event.pull_request.head.ref }}" | tr '/' '-')
+
           neon branch delete $BRANCH_NAME \
             --project $NEON_PROJECT \
             --org $NEON_ORG \
