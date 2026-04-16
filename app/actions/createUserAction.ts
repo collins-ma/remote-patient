@@ -21,7 +21,7 @@ export const createUserAction = actionClient
     const session = await auth()
 
 
-    console.log(session)
+    // console.log(session)
 
    
 
