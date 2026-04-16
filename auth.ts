@@ -37,6 +37,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           where: { username: creds.username },
         })
 
+        console.log('user',user)
+
+
+
         if (!user) return null
 
         // 🔐 Compare hashed password
@@ -44,6 +48,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           creds.password,
           user.password
         )
+
+        console.log(isValidPassword)
 
         if (!isValidPassword) return null
 
