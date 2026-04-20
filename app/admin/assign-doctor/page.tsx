@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 
 export default async function AssignDoctorPage() {
   const session = await auth()
+
   if (!session) redirect("/login")
   if (session.user.role !== "ADMIN") redirect("/unauthorized")
 
@@ -20,9 +21,17 @@ export default async function AssignDoctorPage() {
   })
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-6">Assign Doctor to Patient</h1>
-      <AssignDoctorForm doctors={doctors} patients={patients} />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-3xl bg-white shadow-md rounded-2xl p-8">
+        
+        {/* Title */}
+        <h1 className="text-3xl font-bold text-center mb-8">
+          Assign Doctor to Patient
+        </h1>
+
+        {/* Form */}
+        <AssignDoctorForm doctors={doctors} patients={patients} />
+      </div>
     </div>
   )
 }
